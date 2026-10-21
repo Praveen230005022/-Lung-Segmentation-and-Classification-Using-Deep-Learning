@@ -1,0 +1,56 @@
+# Lung Segmentation and Classification — configuration
+# Relative paths are resolved from the folder containing this file.
+
+seed: 42
+device: auto            # auto | cpu | cuda
+
+data:
+  root: data                    # images/masks paths in the manifest are relative to this folder
+  manifest: data/manifest.csv   # CSV manifest (you create it when the dataset is added)
+  image_column: image_path
+  mask_column: mask_path
+  label_column: label
+  patient_column: patient_id
+  split_column: split           # values: train | val | test (optional column)
+  val_fraction: 0.15            # used only when the split column is absent
+  test_fraction: 0.15           # used only when the split column is absent
+  mask_threshold: 127           # binary masks: pixel > threshold -> lung (class 1)
+  num_workers: 0
+
+image:
+  size: 256                     # images and masks are resized to size x size
+  in_channels: 1                # 1 = grayscale, 3 = RGB
+  normalize_mean: 0.5           # applied after per-image min-max scaling to [0, 1]
+  normalize_std: 0.5
+
+augmentation:                   # applied to the training split only (image and mask together)
+  enabled: true
+  probability: 0.7
+  horizontal_flip: 0.5
+  rotate_limit: 10              # degrees
+  shift_limit: 0.05             # fraction of image size
+  scale_limit: 0.10             # +/- fraction
+
+segmentation:
+  num_classes: 2                # 0 = background, 1 = lung (multi-class masks store class IDs)
+  base_channels: 32             # U-Net width (32 -> 64 -> 128 -> 256 -> 512)
+  epochs: 80
+  batch_size: 8
+  learning_rate: 0.0001
+  weight_decay: 0.0
+  optimizer: adam
+  class_weights: auto           # auto (inverse pixel frequency on train split) or a list, e.g. [0.3, 0.7]
+  dice_loss_weight: 0.0         # > 0 adds soft Dice loss to the weighted cross-entropy
+  target_dice: 0.91             # benchmark to compare against; not a guaranteed result
+  checkpoint: checkpoints/unet_best.pt
+
+classification:
+  class_names: [normal, abnormal]   # labels in the manifest may be these names or integer IDs
+  masked_input: false           # true: classifier sees the lung region only (GT mask in training, U-Net mask in prediction)
+  epochs: 40
+  batch_size: 16
+  learning_rate: 0.0001
+  weight_decay: 0.0
+  optimizer: adam
+  class_weights: auto           # auto (inverse label frequency on train split) or a list
+  checkpoint: checkpoints/classifier_best.pt
